@@ -144,9 +144,10 @@ Con2St:
 	bld	AFlags,afStringBroken
 c2s_1:	stdi	yTXPointer,TXBuf
 	std	Y+yTXEnd,r16
-	stdi	yRXPointer,RXBuf-1
+c2s_2:	stdi	yRXPointer,RXBuf-1
 	rjmp	RetUart
 
+//-------------------------------------------------
 St2Con:
 	ldd	XL,Y+yRXPointer
 	ld	r16,X+
@@ -164,9 +165,10 @@ St2Con:
 	com	r16
 	st	X+,r16
 	std	Y+yTXEnd,XL
-snf_4:	lds	XL,XSEG+RXBuf
-	std	Y+yRXPointer,XL
-	rjmp	RetUart
+snf_4:	rjmp	c2s_2
+//	lds	XL,XSEG+RXBuf
+//	std	Y+yRXPointer,XL
+//	rjmp	RetUart
 
 //---------------------------------------------
 MyCMDProcess:
