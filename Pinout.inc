@@ -50,6 +50,9 @@
 .equ	UARTStartByte = $14
 .equ	RXBufLen      = 32
 ;--- </UART SETTINGS> ---
+.equ	ConsolAddr    = $30
+.equ	StepperAddr   = $4A
+
 
 #define	LED	PORTD,6
 #define	FAN	PORTD,7 

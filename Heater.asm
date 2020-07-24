@@ -39,107 +39,141 @@ ShortStr:
 
 .include "ADC.inc"
 
-
-L_60:	ldi	r16,0	// $00
-	out	UCSRA,r16
-	ldi	r16,24	// $18
-	out	UCSRB,r16
-	ldi	r16,134	// $86
-	out	UBRRH,r16
-	ldi	r16,0	// $00
-	out	UBRRH,r16
-	ldi	r16,25	// $19
-	out	UBRRL,r16
-	ldi	r16,32	// $20
-	std	Y+$04,r16	// 4
-	std	Y+$05,r16	// 5
-	ldi	r16,255	// $ff
-	std	Y+$03,r16	// 3
-	std	Y+$06,YH	// 6
-	cbi	PORTD,2
-	sbi	DDRD,2
-	ldi	r16,53	// $35
-	std	Y+$08,r16	// 8
-	std	Y+$07,YH	// 7
+//--- UART ----
+InitUart:
+	outi	UCSRA,0
+	outi	UCSRB,0b00011000	; Разрешить прием и передачу
+	outi	UCSRC,0b10000110	; 8-бит
+	outi	UBRRH,High(UBRRB_V)
+	outi	UBRRL,Low(UBRRB_V)
+	stdi	yTXPointer,TXBuf
+	std	Y+yTXEnd,r16
+	stdi	yRXPointer,RXBuf-1
+	std	Y+yRXTimer,ZeroReg
+#ifdef	UART_DIR_PORT
+	cbi	UART_DIR_PORT
+	sbi	UART_DIR_DDR
+#endif
+	stdi	yMyAddr,DevAddr
+	std	Y+yRXTXCHS,ZeroReg
 	ret
-L_76:	in	r16,UDR
-	ldd	XL,Y+$03	// 3
-	cpi	XL,255	// $ff
-	breq	L_87
-	cpi	XL,0	// $00
-	breq	L_90
-	lds	r17,$0100	// 256
+
+; Обработчик USART в основном потоке
+.macro	tskUart
+	ldd	XL,Y+yTXPointer
+	ldd	r17,Y+yTXEnd
 	cp	XL,r17
-	breq	L_98
-L_80:	st	X+,r16
-	ldd	r17,Y+$07	// 7
-	add	r17,r16
-	std	Y+$07,r17	// 7
-L_84:	std	Y+$03,XL	// 3
-L_85:	std	Y+$06,YH	// 6
-	rjmp	L_2A7
-L_87:	cpi	r16,20	// $14
-	brne	L_85
-	ldd	r16,Y+$06	// 6
-	cpi	r16,16	// $10
-	brlo	L_85	// brcs
-	ldi	r16,17	// $11
-	std	Y+$07,r16	// 7
-	inc	XL
-	rjmp	L_84
-L_90:	cpi	r16,1	// $01
-	brlo	L_94	// brcs
-	cpi	r16,30	// $1e
-	brlo	L_96	// brcs
-L_94:	ldi	XL,255	// $ff
-	rjmp	L_84
-L_96:	subi	r16,253	// $fd
-	rjmp	L_80
-L_98:	ldd	r17,Y+$07	// 7
-	cp	r16,r17
-	brne	L_94
-	ldi	r16,17	// $11
-	std	Y+$06,r16	// 6
-	ldi	r16,36	// $24
-	std	Y+$04,r16	// 4
-	ldi	XL,1	// $01
+	breq	uart_1
+	sbis	UCSRA,UDRE ; ++ Обработка в режиме передачи
+	rjmp	RetUart  ; выйти если буфер передачи занят
+#ifdef	UART_DIR_PORT
+	sbi	UART_DIR_PORT  ; переключить микросхему на передачу
+#endif
 	ld	r16,X+
-	ld	r17,X+
-	std	Y+$03,XL	// 3
-	ldd	r18,Y+$08	// 8
+	cp	XL,r17
+	brne	uart_2
+	ldd	r16,Y+yRXTXCHS
+uart_2:	out	UDR,r16   ; отправить очереждной байт в буфер
+	std	Y+yTXPointer,XL
+	ldd	r17,Y+yRXTXCHS
+	add	r17,r16
+	std	Y+yRXTXCHS,r17
+	sbi	UCSRA,TXC ; обнуление флага для корректного перехода на прием
+	rjmp	RetUart
+uart_1:
+#ifdef	UART_DIR_PORT
+	sbic	UCSRA,TXC ; ++ Обработка в режиме приема
+	cbi	UART_DIR_PORT  ;  переключить микросхему на прием после передачи крайнего байта
+#endif
+	sbic	UCSRA,RXC  ; выйти из обработчика если нет принятого байта
+	rjmp	ReadUart   ; обработать принятый байт
+.endm
+
+; -1 00 01 02 03 .. NN
+; ST LN DN SR D0 .. CS
+ReadUart:
+	in	r16,UDR
+	ldd	XL,Y+yRXPointer
+	cpi	XL,RXBuf-1
+	breq	rx_1
+	cpi	XL,RXBuf
+	breq	rx_2
+	lds	r17,XSEG+RXBuf	; ++ чтение байт 01...
+	cp	XL,r17		; проверка на завершение посылки
+	breq	rx_3
+rx_8:	st	X+,r16		; сохраненить очередного байта в буфере
+	ldd	r17,Y+yRXTXCHS
+	add	r17,r16
+	std	Y+yRXTXCHS,r17
+rx_5:	std	Y+yRXPointer,XL
+rx_4:	std	Y+yRXTimer,ZeroReg
+	rjmp	RetUart
+rx_1:	cpi	r16,UARTStartByte ; ++ чтение байта -1
+	brne	rx_4		;  проверка на корректный страт-байт
+	ldd	r16,Y+yRXTimer
+	cpi	r16,UARTMesDelay
+	brlo	rx_4		;  проверка на минимальную задержку перед посылкой
+	stdi	yRXTXCHS,UARTStartByte-(RXBuf+3)
+	inc	XL
+	rjmp	rx_5
+rx_2:	cpi	r16,1		; ++ чтение байта 00 (длина)
+	brlo	rx_6		;  проверка на минимальную длину
+	cpi	r16,RXBufLen-2
+	brlo	rx_7		;  проверка на максимальную длину
+rx_6:	ldi	XL,RXBuf-1	; Сброс буфера при ошибочной длине
+	rjmp	rx_5
+rx_7:	subi	r16,-(RXBuf+3)	;  Формирование адреса конца посылки
+	rjmp	rx_8
+rx_3:		; ++ Принята вся посылка ++
+rx_9:	ldd	r17,Y+yRXTXCHS ; проверка контрольной суммы
+	cp	r16,r17
+	brne	rx_6	; сброс буфера при неверной сумме
+	stdi	yRXTimer,UARTMesDelay+1	; Таймер готов к принятию новой посылки
+		; ++ Обработка проверенной посылки
+	stdi	yTXPointer,TXBuf+4
+	ldi	XL,RXBuf+1
+	ld	r16,X+	; Адрес получателя
+	ld	r17,X+	; Адрес отправителя
+	std	Y+yRXPointer,XL
+	ldd	r18,Y+yMyAddr ; *** Выбор обработчика команд
 	cp	r16,r18
 	brne	L_A7
-	rjmp	L_E9
-L_A7:	cpi	r16,48	// $30
+	rjmp	MyCMDProcess
+L_A7:	cpi	r16,ConsolAddr
 	breq	L_D5
-	cpi	r16,74	// $4a
+	cpi	r16,StepperAddr
 	breq	L_C5
-L_AB:	ldi	r16,32	// $20
-	std	Y+$04,r16	// 4
-	std	Y+$05,r16	// 5
-	ldi	r16,255	// $ff
-	std	Y+$03,r16	// 3
-	rjmp	L_2A7
-L_B1:	ldd	XL,Y+$04	// 4
-	cpi	XL,36	// $24
-	breq	L_AB
-	rcall	L_B6
-	rjmp	L_2A7
-L_B6:	mov	r20,XL
-	subi	r20,36	// $24
+				; Не найдено подходящего обработчика
+rx_10:	stdi	yTXPointer,TXBuf
+	std	Y+yTXEnd,r16
+	stdi	yRXPointer,RXBuf-1
+	rjmp	RetUart
+L_B1:
+	ldd	XL,Y+yTXPointer	; Доформирование ответа при наличии данных
+	cpi	XL,TXBuf+4
+	breq	rx_10
+	rcall	ComplUartMes
+	rjmp	RetUart
+
+//-------------------------------------------------
+ComplUartMes:
+	mov	r20,XL
+	subi	r20,TXBuf+4
 	inc	XL
-	std	Y+$05,XL	// 5
-	ldi	XL,32	// $20
-	std	Y+$04,XL	// 4
-	ldi	r18,20	// $14
+	std	Y+yTXEnd,XL
+	ldi	XL,TXBuf
+	std	Y+yTXPointer,XL
+	ldi	r18,UARTStartByte
 	st	X+,r18
 	st	X+,r20
 	st	X+,r16
 	st	X+,r17
-	ldi	r16,255	// $ff
-	std	Y+$03,r16	// 3
-	std	Y+$07,YH	// 7
+	stdi	yRXPointer,RXBuf-1
+	std	Y+yRXTXCHS,ZeroReg
 	ret
+
+
+//-------------------------------------------------
 L_C5:	lds	XL,$0100	// 256
 	ld	r16,-X
 	std	Y+$18,r16	// 24
@@ -147,14 +181,14 @@ L_C5:	lds	XL,$0100	// 256
 	cpi	r16,0	// $00
 	brne	L_CF
 	clt
-	bld	AFlags,1
-	bld	AFlags,2
-L_CF:	ldi	r16,32	// $20
-	std	Y+$04,r16	// 4
-	std	Y+$05,r16	// 5
-	ldi	r16,255	// $ff
-	std	Y+$03,r16	// 3
-	rjmp	L_2A7
+	bld	AFlags,afStringShorted
+	bld	AFlags,afStringBroken
+L_CF:
+	stdi	yTXPointer,TXBuf
+	std	Y+yTXEnd,r16
+	stdi	yRXPointer,RXBuf-1
+	rjmp	RetUart
+
 L_D5:	ldd	XL,Y+$03	// 3
 	ld	r16,X+
 	std	Y+$03,XL	// 3
@@ -173,8 +207,11 @@ L_D5:	ldd	XL,Y+$03	// 3
 	std	Y+$05,XL	// 5
 L_E5:	lds	XL,$0100	// 256
 	std	Y+$03,XL	// 3
-	rjmp	L_2A7
-L_E9:	ldd	XL,Y+$03	// 3
+	rjmp	RetUart
+
+
+MyCMDProcess:
+	ldd	XL,Y+yRXPointer
 L_EA:	ld	r16,X+
 	std	Y+$03,XL	// 3
 	cpi	r16,0	// $00
@@ -581,7 +618,7 @@ L_27E:	subi	r16,1	// $01
 	eor	AFlags,AFlags
 	eor	r8,r8
 	rcall	L_13D
-	rcall	L_60
+	rcall	InitUart
 	rcall	InitADC
 	sei
 L_28C:	in	r16,TIFR
@@ -592,7 +629,7 @@ L_28F:	ldd	XL,Y+$04	// 4
 	cp	XL,r17
 	breq	L_2A3
 	sbis	UCSRA,5
-	rjmp	L_2A7
+	rjmp	RetUart
 	sbi	PORTD,2
 	ld	r16,X+
 	cp	XL,r17
@@ -606,12 +643,12 @@ L_29C:	out	UDR,r16
 	add	r17,r16
 	std	Y+$07,r17	// 7
 	sbi	UCSRA,6
-	rjmp	L_2A7
+	rjmp	RetUart
 L_2A3:	sbic	UCSRA,6
 	cbi	PORTD,2
 	sbic	UCSRA,7
-	rjmp	L_76
-L_2A7:	ldd	r16,Y+$0a	// 10
+	rjmp	ReadUart
+RetUart:	ldd	r16,Y+$0a	// 10
 	cpi	r16,255	// $ff
 	breq	RetADC
 	sbis	ADCSRA,6
