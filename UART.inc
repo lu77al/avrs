@@ -246,8 +246,9 @@ cm72_0:
 
 	cpi	r16,$7F		; *** Переход к загрузчику ***
 	brne	cm7F_0
-	rjmp	BootLoader
+	rjmp	StartBoot
 cm7F_0:
+
 	lds	XL,XSEG+RXBuf
 	std	Y+yRXPointer,XL
 cm_S4:
@@ -259,3 +260,29 @@ cm_S4:
 cm_S3:	lds	r16,XSEG+RXBuf+2 // 258
 	ldd	r17,Y+yMyAddr	// 8
 	rjmp	RetCMDProc
+
+
+StartBoot:
+	outi	SPCR,0b00000000	; Disable SPI
+ 	outi	SPSR,0b00000000
+	cli
+	InitPorts
+	outi	SPH,high(RAMEND)
+	outi	SPL,low(RAMEND)
+	ldi	XH,1
+	ldi_w	YH,YL,$60
+;--- Остановить таймеры ---
+	out	TCCR1A,YH
+	out	TCCR1B,YH
+	out	TCCR0,YH
+	out	TCCR2,YH
+;-- Очиститка памяти с $100 по $1ff
+	ldi_w	YH,YL,$60
+	ldi_w	XH,XL,$100
+
+	ldi_w	ZH,ZL,$60
+bin__1:	st	Z+,YH
+	cpi	ZH,2
+	brlo	bin__1
+
+	rjmp	Boot_continue
