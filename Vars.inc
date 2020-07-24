@@ -59,6 +59,8 @@
 .equ	yMaxCur		= $1F
 
 
+//.equ	iTMP_X		= $100
+
 
 
 
