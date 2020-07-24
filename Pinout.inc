@@ -44,7 +44,7 @@
 .equ	UART_RATE     = 19200	 ; <- BAUD RATE
 .equ	UBRRB_V       = (CPU_FREQ/(16*UART_RATE)-1)
 .equ	DevAddr       = $35
-.equ	TactFreq      = 7812
+.equ	TactFreq      = 7812 ; Incorrect
 .equ	UARTMesDelay  = 4*10*TactFreq/UART_RATE ; 4 Bytes
 .equ	UARTByteDelay = 2*10*TactFreq/UART_RATE ; 2 Bytes
 .equ	UARTStartByte = $14

@@ -39,76 +39,8 @@ ShortStr:
 
 .include "ADC.inc"
 .include "UART.inc"
+.include "Tact.inc"
 
-//----------------------------------------
-L_13D:	ldi	r16,2	// $02
-	out	TCCR2,r16
-	ret
-L_140:	ldi	r16,64	// $40
-	out	TIFR,r16
-	ldd	r16,Y+$06	// 6
-	inc	r16
-	breq	L_14A
-	std	Y+$06,r16	// 6
-	cpi	r16,8	// $08
-	brne	L_14A
-	ldi	r16,255	// $ff
-	std	Y+$03,r16	// 3
-L_14A:	ldd	r23,Y+$00	// 0
-	ldd	r24,Y+$01	// 1
-	ldd	r25,Y+$02	// 2
-	subi	r23,255	// $ff
-	sbci	r24,255	// $ff
-	sbci	r25,255	// $ff
-	std	Y+$00,r23	// 0
-	std	Y+$01,r24	// 1
-	std	Y+$02,r25	// 2
-	cpi	r23,63	// $3f
-	breq	L_156
-	rjmp	L_162
-L_156:	sbi	ADCSRA,6
-	ldi	r16,23	// $17
-	std	Y+$0a,r16	// 10
-	ldd	r16,Y+$19	// 25
-	inc	r16
-	cpi	r16,20	// $14
-	brlo	L_15F	// brcs
-	std	Y+$18,YH	// 24
-	ldi	r16,20	// $14
-L_15F:	std	Y+$19,r16	// 25
-	rcall	L_1D5
-	rjmp	L_28F
-L_162:	cpi	r23,3	// $03
-	brne	L_178
-	ldd	r16,Y+$18	// 24
-	cpi	r16,0	// $00
-	breq	L_16C
-	sbrc	r24,2
-	sbi	PORTD,6
-	sbrs	r24,2
-	cbi	PORTD,6
-	rjmp	L_177
-L_16C:	andi	r24,15	// $0f
-	ldi	r17,4	// $04
-	ldd	r16,Y+$19	// 25
-	cpi	r16,20	// $14
-	brlo	L_172	// brcs
-	ldi	r17,12	// $0c
-L_172:	cp	r24,r17
-	brlo	L_176	// brcs
-	cbi	PORTD,6
-	rjmp	L_177
-L_176:	sbi	PORTD,6
-L_177:	rjmp	L_28F
-L_178:	andi	r23,31	// $1f
-	cpi	r23,1	// $01
-	brne	L_17C
-	rjmp	L_28F
-L_17C:	andi	r23,31	// $1f
-	cpi	r23,2	// $02
-	brne	L_180
-	rjmp	L_28F
-L_180:	rjmp	L_28F
 L_181:	.dw	$934f
 L_182:	.dw	$935f
 L_183:	.dw	$936f
@@ -193,12 +125,13 @@ L_1D1:	.dw	$920d
 L_1D2:	.dw	$950a
 L_1D3:	.dw	$f7e1
 L_1D4:	.dw	$9508
+
 L_1D5:	ldi	r16,10	// $0a
 	sbis	PORTD,7
 	std	Y+$1a,r16	// 26
 	sbrc	AFlags,1
-	std	Y+$18,YH	// 24
-	ldd	r16,Y+$18	// 24
+	std	Y+yHeating,YH	// 24
+	ldd	r16,Y+yHeating	// 24
 	cpi	r16,0	// $00
 	breq	L_1E5
 	sbi	PORTD,7
@@ -228,7 +161,7 @@ L_1F2:	in	r16,MCUCR
 	rcall	L_2AF
 L_1F6:	ldi	r17,2	// $02
 	ldi	r16,104	// $68
-	ldd	r18,Y+$18	// 24
+	ldd	r18,Y+yHeating	// 24
 	cpi	r18,100	// $64
 	brlo	L_1FC	// brcs
 	ldi	r18,100	// $64
@@ -324,6 +257,9 @@ L_252:	std	Y+$10,r24	// 16
 	out	OCR1AL,r18
 	sei
 	ret
+
+
+
 RESET:	ldi	r16,2	// $02
 	out	DDRB,r16
 	ldi	r16,61	// $3d
@@ -366,14 +302,21 @@ L_27E:	subi	r16,1	// $01
 	out	SPSR,r16
 	eor	AFlags,AFlags
 	eor	r8,r8
-	rcall	L_13D
+	rcall	InitTact
 	rcall	InitUart
 	rcall	InitADC
 	sei
-L_28C:	in	r16,TIFR
-	sbrc	r16,6
-	rjmp	L_140
-L_28F:	ldd	XL,Y+$04	// 4
+L_28C:
+
+	tskTact
+RetTact:
+
+;	in	r16,TIFR
+;	sbrc	r16,6
+;	rjmp	L_140
+;RetTact:
+
+	ldd	XL,Y+$04	// 4
 	ldd	r17,Y+$05	// 5
 	cp	XL,r17
 	breq	L_2A3
@@ -397,7 +340,9 @@ L_2A3:	sbic	UCSRA,6
 	cbi	PORTD,2
 	sbic	UCSRA,7
 	rjmp	ReadUart
-RetUart:	ldd	r16,Y+$0a	// 10
+RetUart:
+
+	ldd	r16,Y+$0a	// 10
 	cpi	r16,255	// $ff
 	breq	RetADC
 	sbis	ADCSRA,6
