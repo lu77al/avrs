@@ -39,7 +39,7 @@
 
 ;--- <UART SETTINGS> ---
 #define	UART_DIR_PORT	PORTD,2	 ; <- UartDir
-#define	UART_DIR_DDR	 DDRD,2
+#define	UART_DIR_DDR	DDRD,2
 .equ	CPU_FREQ      = 8000000  ; <- FCPU
 .equ	UART_RATE     = 19200	 ; <- BAUD RATE
 .equ	UBRRB_V       = (CPU_FREQ/(16*UART_RATE)-1)
@@ -53,8 +53,14 @@
 .equ	ConsolAddr    = $30
 .equ	StepperAddr   = $4A
 
+;--- <PWM SETTINGS> ---
+.equ	PWM_FREQ      = 20000
+.equ	PWM_T_DIV     = 1
+.equ	PWM_PERIOD    = (CPU_FREQ/1/PWM_FREQ)
 
-#define	LED	PORTD,6
-#define	FAN	PORTD,7 
+
+#define	LED		PORTD,6
+#define	FAN		PORTD,7
+#define	STR_BR_IN	PIND,4
 
 

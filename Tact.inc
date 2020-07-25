@@ -46,7 +46,9 @@ st_BR1:
 	std	Y+yHeating,ZeroReg
 	ldi	r16,20
 br1_1:	std	Y+yNoRequestCnt,r16
-	rcall	L_1D5	; Need name
+
+	rcall	Set_U_Fan
+
 	rjmp	RetTact
 sk_BR1:
 

@@ -107,36 +107,9 @@ SaveADC:
 	ldi	XL,ADCBuf
 	add	XL,r23
 	add	XL,r23
-	lsl16	r17,r16
+	lsl16	r17,r16	// Normalize to 16 bit
 	lsl16	r17,r16
 	st	X+,r16
 	st	X+,r17
 	rjmp	RetADC
-
-;	cpi	r23,0
-;	brne	
-;	lds	r18,AdjustUabL
-;	lds	r19,AdjustUabH
-;	lsl16	r17,r16
-;	rcall	Mul_16
-;	rjmp	adja_2
-;adja_1:	cpi	r23,1
-;	brne	adja_2
-;	lds	r18,AdjustUinL
-;	lds	r19,AdjustUinH
-;	lsl16	r17,r16
-;	rcall	Mul_16
-;adja_2:	ldi	r18,0
-;	lsl16	r17,r16
-;	rol	r18
-;	lsl16	r17,r16
-;	rol	r18
-;	lsl16	r17,r16
-;	rol	r18
-;	tst	r18
-;	breq	adja_3
-;	ldi_w	r17,r16,$FFFF
-;adja_3:	st	X+,r16
-;	st	X+,r17
-;	ret
 

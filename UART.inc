@@ -30,6 +30,8 @@ InitUart:
 	ld	r16,X+
 	cp	XL,r17
 	brne	uart_2
+	cpi	r17,TXBuf+4
+	brlo	uart_2
 	ldd	r16,Y+yRXTXCHS
 uart_2:	out	UDR,r16   ; отправить очереждной байт в буфер
 	std	Y+yTXPointer,XL

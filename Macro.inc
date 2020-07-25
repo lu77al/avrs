@@ -31,6 +31,12 @@
 	out	@0,r16
 .endm
 
+.macro	cpi_w	; r17,r16,$5476,r18
+	ldi	@3,high(@2)
+	cpi	@1,low(@2)
+	cpc	@0,@3
+.endm
+
 .macro	loop	; r18,Label
 	dec	@0
 	brne	@1
