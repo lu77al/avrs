@@ -1,3 +1,13 @@
+#define	V_RANGE		15.56
+#define	V_MAX		12.0
+#define	V_MAX_K		(V_MAX*655.36/V_RANGE+0.5)
+#define	V_BREAK_MIN	2.5
+#define	V_BREAK_MIN_ADC	(V_BREAK_MIN*256.0/V_RANGE+0.5)
+#define	I_RANGE		125.0 // -62.5 ... 62.5A
+#define	I_ZERO_ADC	32768.0
+#define	I_MAX		25.0
+#define	I_MAX_ADC	(I_ZERO_ADC-I_MAX*65536.0/I_RANGE+0.5)
+
 Set_U_Fan:
 	ldi	r16,10	// Reset FAN intro counter
 	sbis	FAN
@@ -38,13 +48,12 @@ sfu_2:	// --- Heating is allowed ---
 	brne	sfu_6
 	rcall	StartPWM	// start it
 sfu_6:
-	ldi_w	r17,r16,616
-
 	ldd	r18,Y+yHeating	// Limit to 100 %
 	cpi	r18,100	
 	brlo	sfu_7
 	ldi	r18,100
 sfu_7:
+	ldi_w	r17,r16,V_MAX_K // Calculate Udest
 	mul	r16,r18
 	movw	r21:r20, r1:r0
 	mul	r17,r18
@@ -53,6 +62,7 @@ sfu_7:
 	std	Y+yDestUH,r21
 	ret
 
+//------------------------------------------------
 Stabilize:
 	clt
 	bld	AFlags,afADCComplete
@@ -65,7 +75,7 @@ Stabilize:
 	rjmp	st_2
 st_1:	
 	GetADC	adcU	// -- DeltaU --
-	cpi	r17,72	// No string break break if V<???
+	cpi	r17,V_BREAK_MIN_ADC	// No string break break if V<V_BREAK_MIN
 	brlo	st_3
 	set
 	sbis	STR_BR_IN
@@ -79,7 +89,7 @@ st_3:	lsr16	r17,r16
 
 	GetADC	adcI	// -- DeltaI --
 	lsr16	r17,r16
-	ldi_w	r21,r20,6393
+	ldi_w	r21,r20,I_MAX_ADC
 	lsr16	r21,r20
 	sub	r16,r20
 	sbc	r17,r21

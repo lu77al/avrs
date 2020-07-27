@@ -19,10 +19,10 @@
 
 ; CH#0 - ADC0 (PC0) -  U
 .equ	adcU = 0
-.equ	ADMUX0 = Ref256 + 3
+.equ	ADMUX0 = RefAVCC + 3
 ; CH#1 - ADC1 (PC1) -  I
 .equ	adcI = 1
-.equ	ADMUX1 = Ref256 + 2
+.equ	ADMUX1 = RefAVCC + 2
 
 
 .macro	GetADC
